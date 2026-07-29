@@ -14,16 +14,16 @@ export async function createOrder(req, res) {
     let orderInfo = req.body;
 
     // Add current user's name if not provided
-    if (!orderInfo.name) {
+    if (orderInfo.name ==null) {
       orderInfo.name = `${req.user.firstname} ${req.user.lastname}`;
     }
 
     // Generate orderId
     let orderId = "CBC00001";
-    const lastOrder = await Order.findOne().sort({ createdAt: -1 }); // requires timestamps in schema
+    const lastOrder = await Order.findOne().sort({ date: -1 }).limit(1); // requires timestamps in schema
 
     if (lastOrder) {
-      const lastOrderId = lastOrder.orderId; // e.g., "CBC00001"
+      const lastOrderId = lastOrder[0].orderId; // e.g., "CBC00001"
       const lastOrderNumber = parseInt(lastOrderId.replace("CBC", ""));
       const newOrderNumber = lastOrderNumber + 1;
       orderId = "CBC" + newOrderNumber.toString().padStart(5, "0");
@@ -58,7 +58,7 @@ export async function createOrder(req, res) {
           labelledPrice: item.labelledPrice,
           image: item.image,
         },
-        qty,
+        quantity: qty,
       });
 
       total += item.price * qty;
@@ -66,15 +66,16 @@ export async function createOrder(req, res) {
     }
 
     // Create new order
-    const newOrder = new Order({
-      orderId,
-      name: orderInfo.name,
+    const Order = new Order({
+      orderId:orderId,
       email: req.user.email,
+      name: orderInfo.name,
+      
       address: orderInfo.address,
       phone: orderInfo.phone,
-      products,
+      products:[],
       labelledTotal,
-      total,
+      total:0,
     });
 
     const createdOrder = await newOrder.save();
