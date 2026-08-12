@@ -16,6 +16,7 @@ const app = express();
 // Middleware
 
 app.use(cors());
+//mekt dnna ona apita allow krnna puluwan links
 
 app.use(bodyParser.json());
 app.use(express.json());

@@ -29,6 +29,7 @@ export function createUser(req, res) {
     newUser.save()
       .then(() => {
         res.json({ message: 'User created successfully' });
+        
       })
       .catch((err) => {
         res.status(400).json({ message: 'Error creating user', error: err });
@@ -71,6 +72,8 @@ export function loginUser(req, res) {
         token: token,
         role: user.role
       });
+
+     
     })
     .catch(err => {
       console.error("Error logging in:", err);
