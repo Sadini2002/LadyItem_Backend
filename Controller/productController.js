@@ -1,11 +1,9 @@
+import mongoose from "mongoose";
 import Product from "../model/product.js";
 import { isAdmin } from "./userController.js";
 
 // GET ALL PRODUCTS
 export async function getProducts(req, res) {
-  
-  
-
   try {
     if (isAdmin(req)) {
       const products = await Product.find();
@@ -44,18 +42,24 @@ export async function deleteProduct(req, res) {
   if (!isAdmin(req)) {
     return res.status(403).json({ message: "Only admin can delete product" });
   }
-try {
+  try {
     const id = req.params.id;
 
-    const deleted = await Product.findByIdAndDelete(id);
+    let deleted = null;
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      deleted = await Product.findByIdAndDelete(id);
+    }
+    if (!deleted) {
+      deleted = await Product.findOneAndDelete({ productId: id });
+    }
 
     if (!deleted) {
-      return res.status(404).json({ message: "Product not found" });}
+      return res.status(404).json({ message: "Product not found" });
+    }
 
-      return res.json({ message: "Product deleted successfully" });
-    
+    return res.json({ message: "Product deleted successfully" });
   } catch (err) {
-    res.status(500).json({ message: "Error deleting product", error: err });
+    res.status(500).json({ message: "Error deleting product", error: err.message || err });
   }
 }
 
@@ -68,9 +72,13 @@ export async function updateProduct(req, res) {
   try {
     const id = req.params.id;
 
-    const updated = await Product.findByIdAndUpdate(id, req.body, {
-      new: true,
-    });
+    let updated = null;
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      updated = await Product.findByIdAndUpdate(id, req.body, { new: true });
+    }
+    if (!updated) {
+      updated = await Product.findOneAndUpdate({ productId: id }, req.body, { new: true });
+    }
 
     if (!updated) {
       return res.status(404).json({ message: "Product not found" });
@@ -81,31 +89,38 @@ export async function updateProduct(req, res) {
       product: updated,
     });
   } catch (err) {
-    res.status(500).json({ message: "Internal server Error", error: err });
+    res.status(500).json({ message: "Internal server Error", error: err.message || err });
   }
 }
 
 // GET PRODUCT BY ID
 export async function getProductById(req, res) {
-    const id = req.params.Productid;
+  const id = req.params.Productid || req.params.id;
 
-    try {
-        const foundProduct = await Product.findById(id); // Use _id from MongoDB
-        if (!foundProduct) {
-            return res.status(404).json({ message: "Product not found" });
-        }
-
-        if (!foundProduct.isAvailable && !isAdmin(req)) {
-            return res.status(404).json({ message: "Product not found" });
-        }
-
-        return res.json(foundProduct);
-    } catch (err) {
-        res.status(500).json({
-            message: "Internal server Error",
-            error: err.message,
-        });
+  try {
+    let foundProduct = null;
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      foundProduct = await Product.findById(id);
     }
+    if (!foundProduct) {
+      foundProduct = await Product.findOne({ productId: id });
+    }
+
+    if (!foundProduct) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    if (!foundProduct.isAvailable && !isAdmin(req)) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    return res.json(foundProduct);
+  } catch (err) {
+    res.status(500).json({
+      message: "Internal server Error",
+      error: err.message,
+    });
+  }
 }
 
 
