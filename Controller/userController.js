@@ -128,3 +128,70 @@ export function deleteUser(req, res) {
       res.status(500).json({ message: "Server error while deleting user", error: err.message });
     });
 }
+
+export async function getUserById(req, res) {
+  try {
+    const id = req.params.id;
+
+    const foundUser = await User.findById(id).select("-password");
+
+    if (!foundUser) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    res.status(200).json(foundUser);
+
+  } catch (error) {
+    console.error("Get user by ID error:", error);
+
+    res.status(500).json({
+      message: "Failed to get user",
+      error: error.message,
+    });
+  }
+}
+
+
+
+export async function updateUser(req, res) {
+  try {
+    const id = req.params.id;
+
+    const updatedUser = await User.findByIdAndUpdate(
+      id,
+      {
+        firstname: req.body.firstname,
+        lastname: req.body.lastname,
+        email: req.body.email,
+        role: req.body.role,
+        isBlock: req.body.isBlock,
+        img: req.body.img,
+      },
+      {
+        new: true,
+        runValidators: true,
+      }
+    ).select("-password");
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    res.status(200).json({
+      message: "User updated successfully",
+      user: updatedUser,
+    });
+
+  } catch (error) {
+    console.error("Update user error:", error);
+
+    res.status(500).json({
+      message: "Failed to update user",
+      error: error.message,
+    });
+  }
+}
