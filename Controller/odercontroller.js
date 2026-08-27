@@ -1,14 +1,10 @@
 import Order from "../model/order.js";
 import Product from "../model/product.js";
 
-// ==========================================
-// CREATE ORDER
-// ==========================================
+// order create
 export async function createOrder(req, res) {
   try {
-    // ------------------------------------------
-    // 1. Check authorization
-    // ------------------------------------------
+    
     if (!req.user) {
       return res.status(403).json({
         message:
@@ -16,16 +12,12 @@ export async function createOrder(req, res) {
       });
     }
 
-    // ------------------------------------------
-    // 2. Get order information
-    // ------------------------------------------
+    
     const orderInfo = {
       ...req.body,
     };
 
-    // ------------------------------------------
-    // 3. Add user name if not provided
-    // ------------------------------------------
+   
     if (!orderInfo.name) {
       const firstName = req.user.firstname || "";
       const lastName = req.user.lastname || "";
@@ -35,16 +27,11 @@ export async function createOrder(req, res) {
         req.user.email;
     }
 
-    // ------------------------------------------
-    // 4. Generate order ID
-    // ------------------------------------------
-   // ==========================================
-// Generate unique order ID
-// ==========================================
+    // generate unique orderId in the format LDI00001
 let orderId;
 
 const lastOrder = await Order.findOne({
-  orderId: /^CBC\d+$/,
+  orderId: /^LDI\d+$/,
 }).sort({
   orderId: -1,
 });
@@ -53,7 +40,7 @@ let nextNumber = 1;
 
 if (lastOrder && lastOrder.orderId) {
   const match =
-    lastOrder.orderId.match(/^CBC(\d+)$/);
+    lastOrder.orderId.match(/^LDI(\d+)$/);
 
   if (match) {
     nextNumber =
@@ -62,7 +49,7 @@ if (lastOrder && lastOrder.orderId) {
 }
 
 orderId =
-  "CBC" +
+  "LDI" +
   nextNumber
     .toString()
     .padStart(5, "0");
@@ -74,7 +61,7 @@ while (
   nextNumber++;
 
   orderId =
-    "CBC" +
+    "LDI" +
     nextNumber
       .toString()
       .padStart(5, "0");
@@ -119,15 +106,10 @@ while (
       });
     }
 
-    // ------------------------------------------
-    // 8. Process every product
-    // ------------------------------------------
+   
     for (const p of orderInfo.products) {
-      // Support both:
-      // productId = P013
-      // OR
-      // _id = MongoDB ObjectId
-
+      
+      
       const pId =
         p.productId || p._id;
 
@@ -140,18 +122,11 @@ while (
 
       let item = null;
 
-      // ----------------------------------------
-      // First search using custom productId
-      // Example: P013
-      // ----------------------------------------
+      
       item = await Product.findOne({
         productId: pId,
       });
 
-      // ----------------------------------------
-      // If not found, check whether pId is a
-      // valid MongoDB ObjectId
-      // ----------------------------------------
       if (
         !item &&
         /^[0-9a-fA-F]{24}$/.test(
@@ -162,9 +137,6 @@ while (
           await Product.findById(pId);
       }
 
-      // ----------------------------------------
-      // Product doesn't exist
-      // ----------------------------------------
       if (!item) {
         return res.status(404).json({
           message:
@@ -172,9 +144,8 @@ while (
         });
       }
 
-      // ----------------------------------------
-      // Quantity
-      // ----------------------------------------
+      
+      
       const quantity =
         Number(p.quantity) || 1;
 
@@ -185,19 +156,11 @@ while (
         });
       }
 
-      // ----------------------------------------
-      // Product price
-      // ----------------------------------------
+      
       const itemPrice =
         Number(item.price) || 0;
 
-      // ----------------------------------------
-      // Labelled price
-      //
-      // Supports both:
-      // labelledPrice
-      // labalPrice
-      // ----------------------------------------
+      
       const itemLabelledPrice =
         Number(
           item.labelledPrice ??
@@ -205,9 +168,7 @@ while (
             item.price
         ) || 0;
 
-      // ----------------------------------------
-      // Product information
-      // ----------------------------------------
+      
       const itemName =
         item.name ||
         p.name ||
@@ -223,9 +184,6 @@ while (
         p.description ||
         "";
 
-      // ----------------------------------------
-      // Add product to order
-      // ----------------------------------------
       products.push({
         productInfo: {
           productId:
@@ -246,10 +204,8 @@ while (
 
         quantity,
       });
+      // calculate totals
 
-      // ----------------------------------------
-      // Calculate totals
-      // ----------------------------------------
       total +=
         itemPrice * quantity;
 
@@ -258,9 +214,6 @@ while (
         quantity;
     }
 
-    // ------------------------------------------
-    // 9. Use frontend grandTotal if provided
-    // ------------------------------------------
     if (
       orderInfo.grandTotal !==
         undefined &&
@@ -271,9 +224,7 @@ while (
         Number(orderInfo.grandTotal);
     }
 
-    // ------------------------------------------
-    // 10. Create new order
-    // ------------------------------------------
+   
     const newOrder = new Order({
       orderId,
 
@@ -310,15 +261,11 @@ while (
       total,
     });
 
-    // ------------------------------------------
-    // 11. Save order
-    // ------------------------------------------
+    //save order to database      
     const createdOrder =
       await newOrder.save();
 
-    // ------------------------------------------
-    // 12. Return successful response
-    // ------------------------------------------
+    //return success response
     return res.status(201).json({
       message:
         "Order created successfully",
@@ -330,9 +277,7 @@ while (
         createdOrder,
     });
   } catch (err) {
-    // ------------------------------------------
-    // ERROR HANDLING
-    // ------------------------------------------
+    //error handling
     console.error(
       "Create order error:",
       err
@@ -348,17 +293,10 @@ while (
   }
 }
 
-// ==========================================
-// GET ORDERS
-// ==========================================
-export async function getOrders(
-  req,
-  res
-) {
+
+export async function getOrders(req,res) {
   try {
-    // ------------------------------------------
-    // Check authorization
-    // ------------------------------------------
+    
     if (!req.user) {
       return res.status(403).json({
         message:
@@ -368,9 +306,7 @@ export async function getOrders(
 
     let orders;
 
-    // ------------------------------------------
-    // Admin gets all orders
-    // ------------------------------------------
+    
     if (
       req.user.role === "admin"
     ) {
@@ -380,9 +316,7 @@ export async function getOrders(
         });
     }
 
-    // ------------------------------------------
-    // Normal user gets only their orders
-    // ------------------------------------------
+   
     else {
       orders =
         await Order.find({
@@ -393,8 +327,7 @@ export async function getOrders(
         });
     }
 
-    return res.json(orders);
-  } catch (err) {
+    return res.json(orders);} catch (err) {
     console.error(
       "Get orders error:",
       err
@@ -410,9 +343,7 @@ export async function getOrders(
   }
 }
 
-// ==========================================
-// UPDATE ORDER
-// ==========================================
+
 export async function updateOrder(
   req,
   res
@@ -439,9 +370,7 @@ export async function updateOrder(
       paymentStatus,
     } = req.body;
 
-    // ------------------------------------------
-    // Build update object
-    // ------------------------------------------
+    
     const updateFields = {};
 
     if (status) {
@@ -454,9 +383,8 @@ export async function updateOrder(
         paymentStatus;
     }
 
-    // ------------------------------------------
     // Update order
-    // ------------------------------------------
+    
     const updatedOrder =
       await Order.findByIdAndUpdate(
         id,
@@ -466,9 +394,9 @@ export async function updateOrder(
         }
       );
 
-    // ------------------------------------------
+    
     // Order not found
-    // ------------------------------------------
+    
     if (!updatedOrder) {
       return res.status(404).json({
         message:
@@ -476,9 +404,9 @@ export async function updateOrder(
       });
     }
 
-    // ------------------------------------------
+    
     // Successful response
-    // ------------------------------------------
+    
     return res.json({
       message:
         "Order updated successfully",
