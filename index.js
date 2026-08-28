@@ -8,6 +8,7 @@ import jwt from "jsonwebtoken";
 import userRouter from "./Route/userRoute.js";
 import orderRouter from "./Route/orderRoute.js";
 import productRouter from "./Route/productRoute.js";
+import reviewRouter from "./Route/reviewRoute.js";
 
 dotenv.config();
 
@@ -42,6 +43,7 @@ app.use((req, res, next) => {
 app.use("/api/users", userRouter );  
 app.use("/orders", orderRouter );
 app.use("/api/products", productRouter );
+app.use("/api/reviews", reviewRouter );
 
 
 
