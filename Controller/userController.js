@@ -64,7 +64,8 @@ export function loginUser(req, res) {
           role: user.role,
           img: user.img
         },
-        process.env.JWT_KEY
+        process.env.JWT_KEY,
+        { expiresIn: "7d" }
       );
 
       res.json({ 
@@ -195,3 +196,28 @@ export async function updateUser(req, res) {
     });
   }
 }
+/*export async function getMyProfile(req, res) {
+  try {
+    const userId = req.user.id;
+
+    const user = await User.findById(userId).select("-password");
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    res.status(200).json({
+      message: "User profile fetched successfully",
+      user: user,
+    });
+  } catch (error) {
+    console.error("Get profile error:", error);
+
+    res.status(500).json({
+      message: "Failed to get user profile",
+      error: error.message,
+    });
+  }
+}*/
