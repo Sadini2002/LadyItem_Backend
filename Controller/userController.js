@@ -3,6 +3,9 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 dotenv.config();
+import axios from 'axios';
+import { OAuth2Client } from 'google-auth-library';
+
 
 // Create User
 export function createUser(req, res) {
@@ -80,6 +83,100 @@ export function loginUser(req, res) {
       console.error("Error logging in:", err);
       res.status(500).json({ message: "Error logging in", error: err.message });
     });
+}
+
+
+const googleClient = new OAuth2Client(
+  process.env.GOOGLE_CLIENT_ID
+);
+
+export async function loginWithGoogle(req, res) {
+  try {
+    const credential = req.body.credential;
+
+    if (!credential) {
+      return res.status(400).json({
+        message: "Google credential is required"
+      });
+    }
+
+    // Verify Google ID token
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID
+    });
+
+    const googleUser = ticket.getPayload();
+
+    console.log("Google user:", googleUser);
+
+    const user = await User.findOne({
+      email: googleUser.email
+    });
+
+    if (!user) {
+
+      // Create new user
+      const newUser = new User({
+        email: googleUser.email,
+        firstname: googleUser.given_name || "",
+        lastname: googleUser.family_name || "",
+        img: googleUser.picture || null,
+        role: "user"
+      });
+
+      await newUser.save();
+
+      const jwtToken = jwt.sign(
+        {
+          id: newUser._id,
+          email: newUser.email,
+          firstname: newUser.firstname,
+          lastname: newUser.lastname,
+          role: newUser.role,
+          img: newUser.img
+        },
+        process.env.JWT_KEY,
+        { expiresIn: "7d" }
+      );
+
+      return res.json({
+        message: "Login successful",
+        token: jwtToken,
+        role: newUser.role
+      });
+
+    } else {
+
+      // Existing user
+      const jwtToken = jwt.sign(
+        {
+          id: user._id,
+          email: user.email,
+          firstname: user.firstname,
+          lastname: user.lastname,
+          role: user.role,
+          img: user.img
+        },
+        process.env.JWT_KEY,
+        { expiresIn: "7d" }
+      );
+
+      return res.json({
+        message: "Login successful",
+        token: jwtToken,
+        role: user.role
+      });
+    }
+
+  } catch (error) {
+    console.error("Google login error:", error);
+
+    return res.status(400).json({
+      message: "Google login failed",
+      error: error.message
+    });
+  }
 }
 
 // Check Admin
@@ -196,7 +293,7 @@ export async function updateUser(req, res) {
     });
   }
 }
-/*export async function getMyProfile(req, res) {
+export async function getMyProfile(req, res) {
   try {
     const userId = req.user.id;
 
@@ -220,4 +317,4 @@ export async function updateUser(req, res) {
       error: error.message,
     });
   }
-}*/
+}
