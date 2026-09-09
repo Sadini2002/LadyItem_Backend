@@ -8,6 +8,8 @@ import jwt from "jsonwebtoken";
 import userRouter from "./Route/userRoute.js";
 import orderRouter from "./Route/orderRoute.js";
 import productRouter from "./Route/productRoute.js";
+import reviewRouter from "./Route/reviewRoute.js";
+
 
 dotenv.config();
 
@@ -16,6 +18,7 @@ const app = express();
 // Middleware
 
 app.use(cors());
+//mekt dnna ona apita allow krnna puluwan links
 
 app.use(bodyParser.json());
 app.use(express.json());
@@ -41,7 +44,7 @@ app.use((req, res, next) => {
 app.use("/api/users", userRouter );  
 app.use("/orders", orderRouter );
 app.use("/api/products", productRouter );
-
+app.use("/api/reviews", reviewRouter );
 
 
 
