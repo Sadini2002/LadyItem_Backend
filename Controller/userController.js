@@ -119,8 +119,8 @@ export async function loginWithGoogle(req, res) {
       // Create new user
       const newUser = new User({
         email: googleUser.email,
-        firstname: googleUser.given_name || "",
-        lastname: googleUser.family_name || "",
+        firstname: googleUser.given_name || googleUser.name || "Google",
+        lastname: googleUser.family_name || "User",
         img: googleUser.picture || null,
         role: "user"
       });
