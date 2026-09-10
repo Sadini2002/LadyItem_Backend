@@ -5,7 +5,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 import axios from 'axios';
 import { OAuth2Client } from 'google-auth-library';
-
+import nodemailer from 'nodemailer';
 
 // Create User
 export function createUser(req, res) {
@@ -179,6 +179,154 @@ export async function loginWithGoogle(req, res) {
   }
 }
 
+//manage send email
+
+const transport = nodemailer.createTransport({
+  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 587,
+  secure: false,
+  auth: {
+    user: process.env.GMAIL_USER,
+    pass: process.env.GMAIL_PASSWORD
+  }
+})
+
+// Send OTP Function (Supports Login & Signup)
+export async function sendOTP(req, res) {
+  try {
+    const { email, firstname, lastname, password, role, isSignup } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    const randomOTP = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes expiry
+
+    let foundUser = await User.findOne({ email });
+
+    if (isSignup || (firstname && lastname)) {
+      // Signup Mode
+      if (foundUser && foundUser.password && !foundUser.otp) {
+        return res.status(400).json({ message: "Email is already registered. Please login instead." });
+      }
+
+      const hashedPassword = password ? bcrypt.hashSync(password, 10) : "";
+
+      if (!foundUser) {
+        foundUser = new User({
+          email,
+          firstname: firstname || "User",
+          lastname: lastname || "",
+          password: hashedPassword,
+          role: role || "user",
+          otp: randomOTP,
+          otpExpiresAt
+        });
+      } else {
+        foundUser.firstname = firstname || foundUser.firstname;
+        foundUser.lastname = lastname || foundUser.lastname;
+        if (hashedPassword) foundUser.password = hashedPassword;
+        if (role) foundUser.role = role;
+        foundUser.otp = randomOTP;
+        foundUser.otpExpiresAt = otpExpiresAt;
+      }
+    } else {
+      // Login Mode
+      if (!foundUser) {
+        return res.status(404).json({ message: "No account found with this email. Please sign up first." });
+      }
+      foundUser.otp = randomOTP;
+      foundUser.otpExpiresAt = otpExpiresAt;
+    }
+
+    await foundUser.save();
+
+    const mailOptions = {
+      from: `"LadyItem" <${process.env.GMAIL_USER}>`,
+      to: email,
+      subject: "Your Verification Code (OTP)",
+      text: `Your OTP for verification is: ${randomOTP}. It will expire in 10 minutes.`,
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; text-align: center;">
+          <h2>LadyItem Verification Code</h2>
+          <p>Your OTP code is:</p>
+          <h1 style="color: #8B1A24; letter-spacing: 4px;">${randomOTP}</h1>
+          <p>This code will expire in 10 minutes.</p>
+        </div>
+      `
+    };
+
+    // Send email using async/await
+    await transport.sendMail(mailOptions);
+
+    return res.status(200).json({
+      message: "OTP sent successfully to email"
+    });
+
+  } catch (error) {
+    console.error("Error sending OTP:", error);
+    return res.status(500).json({
+      message: "Failed to send OTP",
+      error: error.message
+    });
+  }
+}
+
+
+// Verify OTP Function
+export async function verifyOTP(req, res) {
+  try {
+    const { email, otp } = req.body;
+    if (!email || !otp) {
+      return res.status(400).json({ message: "Email and OTP are required" });
+    }
+    const foundUser = await User.findOne({ email });
+    if (!foundUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    // Check if OTP matches
+    if (foundUser.otp !== otp) {
+      return res.status(400).json({ message: "Invalid OTP code" });
+    }
+    // Check if OTP is expired
+    if (new Date() > new Date(foundUser.otpExpiresAt)) {
+      return res.status(400).json({ message: "OTP code has expired. Please request a new one." });
+    }
+    // Clear OTP fields after successful verification
+    foundUser.otp = null;
+    foundUser.otpExpiresAt = null;
+    await foundUser.save();
+    // Generate JWT token
+    const token = jwt.sign(
+      {
+        id: foundUser._id,
+        email: foundUser.email,
+        firstname: foundUser.firstname,
+        lastname: foundUser.lastname,
+        role: foundUser.role,
+        img: foundUser.img
+      },
+      process.env.JWT_KEY,
+      { expiresIn: "7d" }
+    );
+    return res.status(200).json({
+      message: "OTP verified successfully. Login successful!",
+      token: token,
+      role: foundUser.role
+    });
+  } catch (error) {
+    console.error("Error verifying OTP:", error);
+    return res.status(500).json({
+      message: "Server error while verifying OTP",
+      error: error.message
+    });
+  }
+}
+    
+
+
 // Check Admin
 export function isAdmin(req) {
   if (!req.user) {
@@ -315,6 +463,54 @@ export async function getMyProfile(req, res) {
     res.status(500).json({
       message: "Failed to get user profile",
       error: error.message,
+    });
+  }
+}
+
+// Reset Password Function (with OTP Verification)
+export async function resetPassword(req, res) {
+  try {
+    const { email, otp, newPassword } = req.body;
+
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ message: "Email, OTP, and new password are required" });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters long" });
+    }
+
+    const foundUser = await User.findOne({ email });
+    if (!foundUser) {
+      return res.status(404).json({ message: "User not found with this email" });
+    }
+
+    // Check OTP
+    if (foundUser.otp !== otp) {
+      return res.status(400).json({ message: "Invalid OTP code" });
+    }
+
+    // Check expiration
+    if (new Date() > new Date(foundUser.otpExpiresAt)) {
+      return res.status(400).json({ message: "OTP code has expired. Please request a new code." });
+    }
+
+    // Hash new password & clear OTP fields
+    const hashedPassword = bcrypt.hashSync(newPassword, 10);
+    foundUser.password = hashedPassword;
+    foundUser.otp = null;
+    foundUser.otpExpiresAt = null;
+    await foundUser.save();
+
+    return res.status(200).json({
+      message: "Password reset successful! You can now log in with your new password."
+    });
+
+  } catch (error) {
+    console.error("Error resetting password:", error);
+    return res.status(500).json({
+      message: "Server error while resetting password",
+      error: error.message
     });
   }
 }
