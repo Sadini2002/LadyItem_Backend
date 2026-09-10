@@ -19,7 +19,6 @@ export function createUser(req, res) {
     const hashedPassword = bcrypt.hashSync(req.body.password, 10);
 
     const newUser = new User({
-
       email: req.body.email,
       firstname: req.body.firstname,
       lastname: req.body.lastname,
@@ -355,6 +354,79 @@ export function getAllUsers(req, res) {
     });
 }
 
+// Get Single User by ID
+export function getUserById(req, res) {
+  if (!isAdmin(req)) {
+    return res.status(403).json({ message: "Only admin can access user details" });
+  }
+
+  const userId = req.params.id;
+
+  User.findById(userId, "-password")
+    .then(user => {
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json(user);
+    })
+    .catch(err => {
+      console.error("Error fetching user:", err);
+      res.status(500).json({ message: "Server error while fetching user", error: err.message });
+    });
+}
+
+// Update User
+export function updateUser(req, res) {
+  if (!isAdmin(req)) {
+    return res.status(403).json({ message: "Only admin can update users" });
+  }
+
+  const userId = req.params.id;
+
+  User.findById(userId)
+    .then((targetUser) => {
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (targetUser.role !== "admin") {
+        return res
+          .status(403)
+          .json({ message: "User and customer accounts cannot be edited" });
+      }
+
+      const updateData = { ...req.body };
+
+      if (updateData.password) {
+        updateData.password = bcrypt.hashSync(updateData.password, 10);
+      }
+
+      User.findByIdAndUpdate(userId, updateData, {
+        new: true,
+        select: "-password",
+      })
+        .then((user) => {
+          res.json({ message: "User updated successfully", user });
+        })
+        .catch((err) => {
+          console.error("Error updating user:", err);
+          res
+            .status(500)
+            .json({
+              message: "Server error while updating user",
+              error: err.message,
+            });
+        });
+    })
+    .catch((err) => {
+      console.error("Error finding user:", err);
+      res
+        .status(500)
+        .json({ message: "Server error", error: err.message });
+    });
+}
+
+// Delete User
 export function deleteUser(req, res) {
   // Only admin can delete users
   if (!isAdmin(req)) {
