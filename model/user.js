@@ -36,10 +36,15 @@ const userSchema = mongoose.Schema({
         type: String,
         required: false,
         default: 'https://icon-library.com/images/anonymous-avatar-icon/anonymous-avatar-icon-25.jpg'   
-        
+    },
+    otp: {
+        type: String,
+        required: false
+    },
+    otpExpiresAt: {
+        type: Date,
+        required: false
     }
-
-    
 },
 { timestamps: true });
 const user = mongoose.model('User', userSchema);
